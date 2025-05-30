@@ -46,66 +46,19 @@ services:
     depends_on:
       - mongo
       - map-scraper # Asegura que MongoDB esté listo antes de iniciar Mongo Express
-
-  # Servicio para Redis
-  redis:
-    image: bitnami/redis:latest
+    
+  filtering:
+    build: ./filtering
+    container_name: filtering_waze
     restart: always
-    container_name: redis_waze
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      - REDIS_EXTRA_FLAGS=--maxmemory 2mb --maxmemory-policy allkeys-random # Configuración de Redis para limitar el uso de memoria
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data_1:/bitnami/redis/data # Volumen para persistencia de Redis
-    networks:
-      - redisn
     depends_on:
-      - mongo # Asegura que MongoDB esté listo antes de iniciar Redis
-      - map-scraper
-
-  # Servicio para RedisInsight
-  redisinsight:
-    image: redislabs/redisinsight:latest
-    restart: always
-    container_name: redisinsight_waze
-    volumes:
-      - redis-insight:/data
-    ports:
-      - "5540:5540"
-    networks:
-      - redisn
-    depends_on:
-      - redis
-
-  # Servicio para el request handler
-  request:
-    build: ./request
-    container_name: request_waze
-    depends_on:
-      - map-scraper
       - mongo
-      - redis
-    networks:
-      - redisn
-    restart: always
-
-  # Servicio para el cache (Flask)
-  redis-cache:
-    build: ./redis-cache # El contexto de la construcción para redis-cache (flask)
-    container_name: redis_cache_waze
-    restart: always
-    ports:
-      - "5000:5000"
-    networks:
-      - redisn
+      - map-scraper
     volumes:
-      - ./redis-cache:/app # Asegura que el código se sincronice con el contenedor
-    depends_on:
-      - redis # Asegura que Redis esté listo antes de iniciar el cache
-      - mongo # Asegura que MongoDB esté listo antes de iniciar el cache
-      - map-scraper # Asegura que el scraper esté listo antes de iniciar el cache
+      - ./filtering:/app
+      - ./pig_processing:/pig_processing 
+    networks:
+      - redisn
 
 volumes:
   mongo_data: # Volumen persistente para MongoDB
