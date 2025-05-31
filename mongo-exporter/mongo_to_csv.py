@@ -1,37 +1,87 @@
 import os
 import csv
 from pymongo import MongoClient
+import json
+from datetime import datetime
 
-mongo_host = os.getenv("MONGO_HOST", "localhost")
-mongo_db = os.getenv("MONGO_DB", "mibase")
+# Configuración MongoDB (igual)
+mongo_host = os.getenv("MONGO_HOST", "mongo")
+mongo_db = os.getenv("MONGO_DB", "waze_alertas")
 mongo_collection = os.getenv("MONGO_COLLECTION", "alertas")
 mongo_user = os.getenv("MONGO_USER", "admin")
 mongo_pass = os.getenv("MONGO_PASS", "admin123")
 
-mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/"
+mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/?authSource=admin"
 client = MongoClient(mongo_uri)
 db = client[mongo_db]
 collection = db[mongo_collection]
 
+# Obtener datos
 data = list(collection.find({}, {"_id": 0}))
 
-# Ruta CSV para luego consumirlo con el hadoop
-csv_path = "/data/datos.csv"
+# Ruta CSV
+csv_path = "/data/datos_clean.csv"  # Nombre específico para Pig
 
 if data:
+    # Normalización mejorada para Pig
+    def normalize_field(value):
+        if value is None:
+            return ""
+        if isinstance(value, bool):
+            return str(value).lower()
+        if isinstance(value, (dict, list)):
+            # JSON compacto sin saltos de línea
+            return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+        if isinstance(value, datetime):
+            return value.isoformat()
+        # Escape de comas y comillas
+        return str(value).replace('"', '""').replace('\n', ' ').replace('\r', '')
+    
+    # Campos en orden específico (ajusta según tu esquema Pig)
+    priority_fields = [
+        'uuid', 'type', 'city', 'street', 'speed', 'reliability',
+        'confidence', 'country', 'reportRating', 'pubMillis'
+    ]
+    
+    # Todos los campos (prioritarios primero)
     all_keys = set()
     for doc in data:
         all_keys.update(doc.keys())
-    all_keys = list(all_keys)
-
-    with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=all_keys)
-        writer.writeheader()
-        for row in data:
-            # acá se llenan las filas q no tienen todas las key -> no todas las alertas tienen los mismo attributos
-            full_row = {key: row.get(key, "") for key in all_keys}
-            writer.writerow(full_row)
     
-    print(f"CSV generado exitosamente en {csv_path}")
+    # Ordenamos: campos prioritarios primero, luego el resto
+    fieldnames = priority_fields + [k for k in sorted(all_keys) if k not in priority_fields]
+
+    # Escribir CSV optimizado para Pig
+    with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        
+        # Header
+        writer.writerow(fieldnames)
+        
+        for row in data:
+            try:
+                # Construir fila con valores normalizados
+                csv_row = []
+                for field in fieldnames:
+                    value = row.get(field)
+                    
+                    # Manejo especial para campos JSON/embebidos
+                    if field in ['location', 'wazeData'] and isinstance(value, (dict, list)):
+                        value = json.dumps(value, separators=(',', ':'))
+                    
+                    csv_row.append(normalize_field(value))
+                
+                writer.writerow(csv_row)
+            except Exception as e:
+                print(f"Error procesando fila: {e}")
+                continue
+    
+    print(f"✅ CSV compatible con Pig generado en {csv_path}")
+    print(f"📊 Total registros: {len(data)}")
+    print(f"📝 Campos: {len(fieldnames)}")
+    print("⚙️ Configuración CSV:")
+    print(f"   - Delimitador: ','")
+    print(f"   - Quotechar: '\"'")
+    print(f"   - Campos JSON convertidos a strings compactos")
 else:
-    print("No se encontraron datos.")
+    print("⚠️ No se encontraron datos en MongoDB")
