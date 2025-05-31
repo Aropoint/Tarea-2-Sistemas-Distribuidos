@@ -5,18 +5,16 @@ networks:
     driver: bridge
 
 services:
-  # Servicio para el scraper
   map-scraper:
-    build: ./map-scraper # El contexto de la construcción para el scraper
+    build: ./map-scraper
     container_name: map_scraper_waze
     networks:
       - redisn
     volumes:
-      - ./map-scraper:/app # Asegura que se sincronice el código con el contenedor
+      - ./map-scraper:/app
 
-  # Servicio para MongoDB
   mongo:
-    build: ./bdd # El contexto de la construcción para MongoDB
+    build: ./bdd
     container_name: mongo_waze
     ports:
       - "27017:27017"
@@ -28,9 +26,8 @@ services:
     networks:
       - redisn
     depends_on:
-      - map-scraper # Asegura que el scraper esté listo antes de iniciar MongoDB
+      - map-scraper
 
-  # Servicio para Mongo Express
   mongo-express:
     image: mongo-express
     container_name: mongo_express_waze
@@ -45,70 +42,30 @@ services:
       - redisn
     depends_on:
       - mongo
-      - map-scraper # Asegura que MongoDB esté listo antes de iniciar Mongo Express
+      - map-scraper
 
-  # Servicio para Redis
-  redis:
-    image: bitnami/redis:latest
-    restart: always
-    container_name: redis_waze
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      - REDIS_EXTRA_FLAGS=--maxmemory 2mb --maxmemory-policy allkeys-random # Configuración de Redis para limitar el uso de memoria
-    ports:
-      - "6379:6379"
+  hadoop-pig:
+    build: ./hadoop-pig
+    container_name: hadoop_pig_waze
+    networks:
+      - redisn
     volumes:
-      - redis_data_1:/bitnami/redis/data # Volumen para persistencia de Redis
+      - ./data:/data
+    stdin_open: true
+    tty: true
+
+  mongo-exporter:
+    build: ./mongo-exporter
+    container_name: mongo_exporter
     networks:
       - redisn
     depends_on:
-      - mongo # Asegura que MongoDB esté listo antes de iniciar Redis
-      - map-scraper
-
-  # Servicio para RedisInsight
-  redisinsight:
-    image: redislabs/redisinsight:latest
-    restart: always
-    container_name: redisinsight_waze
-    volumes:
-      - redis-insight:/data
-    ports:
-      - "5540:5540"
-    networks:
-      - redisn
-    depends_on:
-      - redis
-
-  # Servicio para el request handler
-  request:
-    build: ./request
-    container_name: request_waze
-    depends_on:
-      - map-scraper
       - mongo
-      - redis
-    networks:
-      - redisn
-    restart: always
-
-  # Servicio para el cache (Flask)
-  redis-cache:
-    build: ./redis-cache # El contexto de la construcción para redis-cache (flask)
-    container_name: redis_cache_waze
-    restart: always
-    ports:
-      - "5000:5000"
-    networks:
-      - redisn
     volumes:
-      - ./redis-cache:/app # Asegura que el código se sincronice con el contenedor
-    depends_on:
-      - redis # Asegura que Redis esté listo antes de iniciar el cache
-      - mongo # Asegura que MongoDB esté listo antes de iniciar el cache
-      - map-scraper # Asegura que el scraper esté listo antes de iniciar el cache
-
-volumes:
-  mongo_data: # Volumen persistente para MongoDB
-  redis_data_1: # Volumen persistente para Redis
-    driver: local
-  redis-insight: # Volumen para RedisInsight
+      - ./data:/data
+    environment:
+      - MONGO_HOST=mongo
+      - MONGO_DB=waze_alertas
+      - MONGO_COLLECTION=alertas
+      - MONGO_USER=admin
+      - MONGO_PASS=admin123
