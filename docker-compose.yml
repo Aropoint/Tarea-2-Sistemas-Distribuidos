@@ -23,8 +23,11 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=admin123
     networks:
       - redisn
-    depends_on:
-      - map-scraper
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   mongo-express:
     image: mongo-express
@@ -52,7 +55,7 @@ services:
       - ./data:/data
     environment:
       - MONGO_HOST=mongo
-      - MONGO_DB=waze_alertas
+      - MONGO_DB=waze_db
       - MONGO_COLLECTION=alertas
       - MONGO_USER=admin
       - MONGO_PASS=admin123
