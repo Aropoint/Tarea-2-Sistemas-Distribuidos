@@ -1,5 +1,4 @@
--- filepath: d:\Codes\Tarea-2-Sistemas-Distribuidos\hadoop-pig\scripts\process_waze_alerts.pig
-REGISTER '/opt/pig/lib/piggybank.jar';
+-- REGISTER '/opt/pig/lib/piggybank.jar';
 
 -- 1. Cargar datos desde HDFS
 raw_data = LOAD '/input/waze_data.csv'
@@ -37,22 +36,33 @@ raw_data = LOAD '/input/waze_data.csv'
 -- 2. Eliminar duplicados exactos
 deduped = DISTINCT raw_data;
 
--- 3. Filtrar registros válidos y normalizar campos clave
-clean_data = FILTER deduped BY (uuid IS NOT NULL AND type IS NOT NULL AND city IS NOT NULL AND pubMillis IS NOT NULL);
+-- 3. Filtrar registros válidos con todos los campos clave presentes y no vacíos
+clean_data = FILTER deduped BY 
+    (uuid IS NOT NULL AND TRIM(uuid) != '' AND
+     type IS NOT NULL AND TRIM(type) != '' AND
+     city IS NOT NULL AND TRIM(city) != '' AND
+     street IS NOT NULL AND TRIM(street) != '' AND
+     pubMillis IS NOT NULL AND TRIM(pubMillis) != '');
+
+-- 4. Normalización de campos clave + casting de tiempo
 homogenized = FOREACH clean_data GENERATE
     uuid,
     UPPER(TRIM(type)) AS type_norm,
     UPPER(TRIM(city)) AS city_norm,
-    (long)pubMillis AS timestamp,
-    TRIM(reportDescription) AS description;
+    UPPER(TRIM(street)) AS street_norm,
+    (long)pubMillis AS timestamp;
 
--- 4. Agrupar por tipo y comuna (esquema unificado)
+-- 5. Agrupación por tipo y comuna
 grouped = GROUP homogenized BY (type_norm, city_norm);
+
 unified = FOREACH grouped GENERATE
     FLATTEN(group) AS (type, city),
     COUNT(homogenized) AS count,
     MIN(homogenized.timestamp) AS first_timestamp,
     MAX(homogenized.timestamp) AS last_timestamp;
 
--- 5. Guardar resultados en HDFS
+-- 6. Guardar datos agregados para análisis
 STORE unified INTO '/output/cleaned_metrics' USING PigStorage(',');
+
+-- 7. Guardar datos limpios y normalizados (sin descripción)
+STORE homogenized INTO '/output/cleaned_records' USING PigStorage(',');

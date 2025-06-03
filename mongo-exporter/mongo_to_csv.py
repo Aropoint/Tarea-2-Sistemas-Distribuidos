@@ -15,14 +15,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configuración MongoDB
 mongo_host = os.getenv("MONGO_HOST", "mongo")
 mongo_db = os.getenv("MONGO_DB", "waze_db")
 mongo_collection = os.getenv("MONGO_COLLECTION", "alertas")
 mongo_user = os.getenv("MONGO_USER", "admin")
 mongo_pass = os.getenv("MONGO_PASS", "admin123")
 
-# Parámetros de reintento
 MAX_RETRIES = 10  # Número máximo de reintentos
 RETRY_DELAY = 30  # Segundos entre reintentos
 
@@ -31,7 +29,7 @@ def connect_to_mongo():
     try:
         mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/?authSource=admin&serverSelectionTimeoutMS=5000"
         client = MongoClient(mongo_uri, connectTimeoutMS=20000, socketTimeoutMS=None)
-        client.admin.command('ping')  # Test de conexión
+        client.admin.command('ping')
         logger.info("✅ Conexión a MongoDB establecida correctamente")
         return client
     except Exception as e:
@@ -50,10 +48,8 @@ def normalize_field(value):
     return str(value).replace('"', '""').replace('\n', ' ').replace('\r', '')
 
 def export_to_csv():
-    """Exporta datos de MongoDB a CSV con reintentos y normalización total, sin location ni wazeData"""
     retry_count = 0
 
-    # Esquema fijo SIN location ni wazeData
     fieldnames = [
         'uuid', 'type', 'city', 'street', 'speed', 'reliability', 'confidence', 'country',
         'reportRating', 'pubMillis', 'additionalInfo', 'fromNodeId', 'id', 'inscale',
@@ -67,7 +63,6 @@ def export_to_csv():
         try:
             logger.info(f"🔍 Intento {retry_count + 1}/{MAX_RETRIES}")
 
-            # 1. Conectar a MongoDB
             client = connect_to_mongo()
             if client is None:
                 raise ConnectionError("No se pudo conectar a MongoDB")
@@ -75,7 +70,6 @@ def export_to_csv():
             db = client[mongo_db]
             collection = db[mongo_collection]
 
-            # 2. Verificar si hay datos
             count = collection.count_documents({})
             logger.info(f"📊 Documentos encontrados en MongoDB: {count}")
 
@@ -85,14 +79,12 @@ def export_to_csv():
                 retry_count += 1
                 continue
 
-            # 3. Obtener datos
             data = list(collection.find({}, {"_id": 0}))
 
-            # 4. Escribir CSV con esquema fijo y normalización
             csv_path = "/data/datos_clean.csv"
             with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
                 writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                # writer.writerow(fieldnames)
+                # writer.writerow(fieldnames) acá le saqué el encabezado
                 for row in data:
                     try:
                         csv_row = []
@@ -107,7 +99,6 @@ def export_to_csv():
             logger.info(f"✅ CSV generado exitosamente en {csv_path}")
             logger.info(f"📊 Registros exportados: {len(data)}")
 
-            # Verificación final
             if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
                 logger.info("✔️ Verificación: Archivo CSV creado correctamente")
                 return True

@@ -1,43 +1,57 @@
-REGISTER '/opt/pig/lib/piggybank.jar';
+-- REGISTER '/opt/pig/lib/piggybank.jar';
 
--- 1. Cargar datos limpios
-cleaned = LOAD '/output/cleaned_metrics'
+-- 1. Cargar registros limpios y normalizados
+records = LOAD '/output/cleaned_records'
     USING PigStorage(',')
     AS (
+        uuid:chararray,
         type:chararray,
         city:chararray,
-        count:long,
-        first_timestamp:long,
-        last_timestamp:long
+        street:chararray,
+        timestamp:long
     );
 
--- 2. Agrupar incidentes por comuna (patrones geográficos)
-by_city = GROUP cleaned BY city;
+-- 2. Métrica: Total de incidentes por comuna
+by_city = GROUP records BY city;
 city_metrics = FOREACH by_city GENERATE
     group AS city,
-    SUM(cleaned.count) AS total_incidents;
+    COUNT(records) AS total_incidents;
 
 STORE city_metrics INTO '/output/analysis_by_city' USING PigStorage(',');
 
--- 3. Contar frecuencia de tipos de incidentes
-by_type = GROUP cleaned BY type;
+-- 3. Métrica: Total de incidentes por tipo
+by_type = GROUP records BY type;
 type_metrics = FOREACH by_type GENERATE
     group AS type,
-    SUM(cleaned.count) AS total_incidents;
+    COUNT(records) AS total_incidents;
 
 STORE type_metrics INTO '/output/analysis_by_type' USING PigStorage(',');
 
--- 4. Análisis temporal: incidentes por día (usando first_timestamp)
--- Convertir timestamp a día (ejemplo: dividir por 86400000 para obtener el día en epoch)
-by_day = FOREACH cleaned GENERATE
+-- 4. Métrica: Total por tipo y comuna
+by_type_city = GROUP records BY (type, city);
+type_city_metrics = FOREACH by_type_city GENERATE
+    FLATTEN(group) AS (type, city),
+    COUNT(records) AS total_incidents;
+
+STORE type_city_metrics INTO '/output/analysis_by_type_city' USING PigStorage(',');
+
+-- 5. Métrica: Total por calle y comuna
+by_street_city = GROUP records BY (street, city);
+street_city_metrics = FOREACH by_street_city GENERATE
+    FLATTEN(group) AS (street, city),
+    COUNT(records) AS total_incidents;
+
+STORE street_city_metrics INTO '/output/analysis_by_street_city' USING PigStorage(',');
+
+-- 6. Métrica: Incidentes por día (dividiendo timestamp en milisegundos por 86.400.000)
+by_day = FOREACH records GENERATE
+    (long)(timestamp / 86400000) AS day_epoch,
     type,
-    city,
-    (long)(first_timestamp / 86400000) AS day_epoch,
-    count;
+    city;
 
 group_by_day = GROUP by_day BY day_epoch;
 day_metrics = FOREACH group_by_day GENERATE
     group AS day_epoch,
-    SUM(by_day.count) AS total_incidents;
+    COUNT(by_day) AS total_incidents;
 
 STORE day_metrics INTO '/output/analysis_by_day' USING PigStorage(',');
