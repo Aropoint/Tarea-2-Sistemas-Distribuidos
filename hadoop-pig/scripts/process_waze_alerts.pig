@@ -1,6 +1,3 @@
--- REGISTER '/opt/pig/lib/piggybank.jar';
-
--- 1. Cargar datos desde HDFS
 raw_data = LOAD '/input/waze_data.csv'
     USING PigStorage(',')
     AS (
@@ -61,8 +58,4 @@ unified = FOREACH grouped GENERATE
     MIN(homogenized.timestamp) AS first_timestamp,
     MAX(homogenized.timestamp) AS last_timestamp;
 
--- 6. Guardar datos agregados para análisis
-STORE unified INTO '/output/cleaned_metrics' USING PigStorage(',');
-
--- 7. Guardar datos limpios y normalizados (sin descripción)
 STORE homogenized INTO '/output/cleaned_records' USING PigStorage(',');

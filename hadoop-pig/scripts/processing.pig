@@ -1,6 +1,3 @@
--- REGISTER '/opt/pig/lib/piggybank.jar';
-
--- 1. Cargar registros limpios y normalizados
 records = LOAD '/output/cleaned_records'
     USING PigStorage(',')
     AS (
