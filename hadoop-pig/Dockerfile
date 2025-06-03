@@ -42,9 +42,18 @@ RUN mkdir -p ${PIG_HOME}/lib && \
     (rm -f ${PIG_HOME}/lib/piggybank.jar || true) && \
     ln -s ${PIG_HOME}/lib/piggybank-${PIG_VERSION}.jar ${PIG_HOME}/lib/piggybank.jar
 
-# Configurar variables de entorno para Pig (AGREGAR ESTO)
-ENV PIG_CLASSPATH=${HADOOP_HOME}/etc/hadoop:${PIG_HOME}/lib/piggybank.jar
-ENV PIG_OPTS="-Dpig.additional.jars=${PIG_HOME}/lib/piggybank.jar"
+# Descargar json-simple.jar (nuevo)
+RUN wget -P ${PIG_HOME}/lib/ https://repo1.maven.org/maven2/com/googlecode/json-simple/json-simple/1.1.1/json-simple-1.1.1.jar && \
+    ln -s ${PIG_HOME}/lib/json-simple-1.1.1.jar ${PIG_HOME}/lib/json-simple.jar
+
+# Configurar variables de entorno para Pig (modificado para incluir json-simple)
+ENV PIG_CLASSPATH=${HADOOP_HOME}/etc/hadoop:${PIG_HOME}/lib/piggybank.jar:${PIG_HOME}/lib/json-simple.jar
+ENV PIG_OPTS="-Dpig.additional.jars=${PIG_HOME}/lib/piggybank.jar,${PIG_HOME}/lib/json-simple.jar"
+
+# Verificar que los archivos existen
+RUN ls -lh ${PIG_HOME}/lib/ && \
+    test -f ${PIG_HOME}/lib/piggybank.jar && \
+    test -f ${PIG_HOME}/lib/json-simple.jar
 
 # Configurar Hadoop
 COPY core-site.xml $HADOOP_HOME/etc/hadoop/
