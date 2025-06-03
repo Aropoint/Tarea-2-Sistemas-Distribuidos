@@ -72,7 +72,9 @@ services:
     tty: true
     depends_on:
       - mongo-exporter
-    environment:
-      - HADOOP_HEAPSIZE_MAX=2048m
-      - PIG_OPTS=-Dmapreduce.map.memory.mb=2048 -Dmapreduce.reduce.memory.mb=2048
     command: ["/entrypoint.sh"]
+    ports:
+      - "8088:8088"
+      - "50070:50070"
+      - "9000:9000"
+      - "19888:19888"

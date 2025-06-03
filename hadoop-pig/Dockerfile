@@ -1,12 +1,13 @@
 FROM openjdk:8-jdk
 
-ENV HADOOP_VERSION=3.3.6
+ENV HADOOP_VERSION=2.10.2
 ENV PIG_VERSION=0.17.0
 ENV HADOOP_HOME=/opt/hadoop
 ENV PIG_HOME=/opt/pig
 ENV JAVA_HOME=/usr/local/openjdk-8
 ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 ENV PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PIG_HOME/bin:$JAVA_HOME/bin
+ENV YARN_APPLICATION_CLASSPATH=$HADOOP_HOME/etc/hadoop,$HADOOP_HOME/share/hadoop/common/*,$HADOOP_HOME/share/hadoop/common/lib/*,$HADOOP_HOME/share/hadoop/hdfs/*,$HADOOP_HOME/share/hadoop/hdfs/lib/*,$HADOOP_HOME/share/hadoop/mapreduce/*,$HADOOP_HOME/share/hadoop/mapreduce/lib/*,$HADOOP_HOME/share/hadoop/yarn/*,$HADOOP_HOME/share/hadoop/yarn/lib/*
 
 # Instalar dependencias
 RUN apt-get update && apt-get install -y \
@@ -73,9 +74,10 @@ RUN ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa && \
 
 # Copiar scripts
 COPY --chown=hadoop:hadoop entrypoint.sh /entrypoint.sh
-COPY --chown=hadoop:hadoop check_and_upload_csv.sh /home/hadoop/
 COPY --chown=hadoop:hadoop scripts/ /scripts/
 
-RUN chmod +x /entrypoint.sh /home/hadoop/check_and_upload_csv.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8088 50070 9000
 
 ENTRYPOINT ["/entrypoint.sh"]

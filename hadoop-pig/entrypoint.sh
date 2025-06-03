@@ -7,14 +7,28 @@ DATA_DIR=/data
 HDFS_INPUT=/input
 HDFS_OUTPUT=/output
 PIG_SCRIPT=/scripts/process_waze_alerts.pig
+PIG_SCRIPT2=/scripts/processing.pig
 CSV_FILE=datos_clean.csv
 HDFS_FILE=waze_data.csv
 
 # 1. Iniciar servicios SSH y Hadoop
 echo "⚙️ Iniciando servicios..."
+echo "Iniciando SSH..."
 sudo service ssh start
-$HADOOP_HOME/bin/hdfs namenode -format -force
+
+echo "Chequeando si es necesario formatear NameNode..."
+if [ ! -d "$HADOOP_HOME/data/namenode/current" ]; then
+    echo "🧹 Formateando NameNode por primera vez..."
+    $HADOOP_HOME/bin/hdfs namenode -format -force
+fi
+
+ssh-keyscan -H localhost >> ~/.ssh/known_hosts 2>/dev/null
+ssh-keyscan -H 0.0.0.0 >> ~/.ssh/known_hosts 2>/dev/null
+
+echo "Iniciando HDFS (start-dfs.sh)..."
 $HADOOP_HOME/sbin/start-dfs.sh
+
+echo "Iniciando YARN (start-yarn.sh)..."
 $HADOOP_HOME/sbin/start-yarn.sh
 
 echo "⏳ Esperando inicialización de HDFS..."
@@ -72,13 +86,26 @@ export PIG_CLASSPATH=$HADOOP_HOME/etc/hadoop:$HADOOP_HOME/share/hadoop/common/*:
 
 # 6. Esperar que YARN esté listo
 echo "⏳ Esperando que YARN esté listo..."
-until $HADOOP_HOME/bin/yarn node -list 2> /dev/null | grep -q "RUNNING"; do
+until $HADOOP_HOME/bin/yarn node -list 2>/dev/null | grep -q "RUNNING"; do
     sleep 5
 done
 
+echo "📄 Listado del archivo en HDFS:"
+$HADOOP_HOME/bin/hdfs dfs -ls $HDFS_INPUT/$HDFS_FILE
+
+echo "Iniciando JobHistory Server..."
+$HADOOP_HOME/sbin/mr-jobhistory-daemon.sh start historyserver
+
 # 7. Ejecutar script Pig
-echo "🐷 Ejecutando script Pig..."
-$PIG_HOME/bin/pig -x mapreduce -f $PIG_SCRIPT
+echo "🐷 Ejecutando script Pig para la filtración y homogeneización de los datos"
+$PIG_HOME/bin/pig -f $PIG_SCRIPT
+
+sleep 5
+
+
+# 8. Ejecutar segundo script Pig
+echo "🐷 Ejecutando el segundo script Pig para el procesamiento de los datos"
+$PIG_HOME/bin/pig -f $PIG_SCRIPT2
 
 # 8. Mantener contenedor activo
 echo "✓ Procesamiento completado. Contenedor activo..."
