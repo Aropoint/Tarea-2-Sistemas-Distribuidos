@@ -111,8 +111,30 @@ $PIG_HOME/bin/pig -f $PIG_SCRIPT2
 # acá se hace cat de los outputs de Pig
 echo "Se inicia el cat de los outputs de Pig"
 
-# $HADOOP_HOME/bin/hdfs dfs -cat $HDFS_OUTPUT/part-00000 verificar esto
+echo "Resultados del primer script Pig (filtrado y homogeneización):"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/cleaned_records/part-r-00000
+sleep 5
 
+echo "Resultados del segundo script Pig (análisis de datos):"
+echo "Primero el analisis por comuna"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/analysis_by_city/part-r-00000
+sleep 5
+
+echo "Ahora el analisis por hora (los dias estan en epoch)"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/analysis_by_day/part-r-00000
+sleep 5
+
+echo "Ahora el analisis por calle y comuna"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/analysis_by_street_city/part-r-00000
+sleep 5
+
+echo "Ahora el analisis por tipo de alerta"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/analysis_by_type/part-r-00000
+sleep 5
+
+echo "Ahora el analisis por tipo de alerta y comuna"
+$HADOOP_HOME/bin/hdfs dfs -cat /output/analysis_by_type_city/part-r-00000
+sleep 5
 
 # Mantener contenedor activo - esto para poder ver el output mas que nada
 echo "✓ Procesamiento completado. Contenedor activo..."
