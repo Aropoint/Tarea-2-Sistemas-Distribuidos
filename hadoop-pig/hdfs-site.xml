@@ -11,4 +11,12 @@
         <name>dfs.datanode.data.dir</name>
         <value>/opt/hadoop/data/datanode</value>
     </property>
+    <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.servicerpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
 </configuration>
